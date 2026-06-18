@@ -273,9 +273,8 @@ async function cargarTipos5W() {
                 
                 // Limpiar y agregar opción "Todos"
                 if (tipos.length === 0) {
-                    select.innerHTML = '<option value="">Todos los Tipos de 5W (Sin datos aún - Importa Excel)</option>';
-                    select.disabled = true;
-                    console.warn('⚠️ No hay tipos de 5W en la base de datos. Importa un Excel con la columna "Indicador de Distribución Impactado:"');
+                    select.innerHTML = '<option value="">Todos los Tipos de 5W</option>';
+                    select.disabled = false;
                 } else {
                     select.innerHTML = '<option value="">Todos los Tipos de 5W</option>';
                     select.disabled = false;
@@ -315,8 +314,8 @@ async function cargarMeses() {
                 
                 // Limpiar y agregar opción "Todos"
                 if (meses.length === 0) {
-                    select.innerHTML = '<option value="">Todos los Meses (Sin fechas válidas)</option>';
-                    select.disabled = true;
+                    select.innerHTML = '<option value="">Todos los Meses</option>';
+                    select.disabled = false;
                 } else {
                     select.innerHTML = '<option value="">Todos los Meses</option>';
                     select.disabled = false;
@@ -1440,11 +1439,6 @@ function cargarTablaCompleta() {
         .then(response => {
             const analisis = response.data.data;
             
-            // Destruir tabla anterior si existe
-            if (tablaAnalisis) {
-                tablaAnalisis.destroy();
-            }
-            
             // Limpiar tbody
             const tbody = document.querySelector('#tabla-analisis tbody');
             tbody.innerHTML = '';
@@ -1496,18 +1490,20 @@ function cargarTablaCompleta() {
                 `;
             });
             
-            // Verificar estructura de la tabla antes de inicializar
-            console.log('Inicializando DataTable...');
-            const theadCols = $('#tabla-analisis thead th').length;
-            const tbodyCols = $('#tabla-analisis tbody tr:first td').length;
-            console.log('Número de columnas en thead:', theadCols);
-            console.log('Número de columnas en primera fila tbody:', tbodyCols);
-            
-            if (theadCols !== tbodyCols) {
-                console.warn(`⚠️ Desbalance de columnas detectado: thead=${theadCols}, tbody=${tbodyCols}`);
+            // Destruir instancia previa de forma segura
+            if ($.fn.DataTable.isDataTable('#tabla-analisis')) {
+                $('#tabla-analisis').DataTable().destroy();
             }
-            
-            // Inicializar DataTable con configuración más flexible
+
+            // Si no hay filas mostrar mensaje y salir sin inicializar DataTable
+            if (analisis.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="22" style="text-align:center;padding:40px;color:#999;">
+                    No hay análisis para mostrar. Importa un Excel para comenzar.
+                </td></tr>`;
+                return;
+            }
+
+            // Inicializar DataTable
             tablaAnalisis = $('#tabla-analisis').DataTable({
                 pageLength: 25,
                 order: [[0, 'desc']],
@@ -1526,31 +1522,14 @@ function cargarTablaCompleta() {
                     zeroRecords: 'No se encontraron registros'
                 },
                 scrollX: true,
-                autoWidth: false,
-                // Configuración de columnas más robusta
+                autoWidth: true,
                 columns: [
-                    null, // ID
-                    null, // Categoría
-                    null, // Tipo 5W
-                    null, // Nivel
-                    null, // Ruta
-                    null, // Fecha
-                    null, // Score
-                    null, // Grade
-                    null, // Coherencia
-                    null, // Causa Raíz %
-                    null, // Plan Acción %
-                    { width: '250px' }, // Problema
-                    { width: '250px' }, // Por qué 1
-                    { width: '250px' }, // Por qué 2
-                    { width: '250px' }, // Por qué 3
-                    { width: '250px' }, // Causa Raíz Completa
-                    { width: '250px' }, // Plan Completo
-                    { width: '250px' }, // Fortalezas
-                    { width: '250px' }, // Debilidades
-                    { width: '250px' }, // Sugerencias
-                    { width: '250px' }, // Tips IA
-                    { orderable: false, searchable: false, width: '150px' } // Acciones
+                    null, null, null, null, null, null, null, null, null, null, null,
+                    { width: '250px' }, { width: '250px' }, { width: '250px' },
+                    { width: '250px' }, { width: '250px' }, { width: '250px' },
+                    { width: '250px' }, { width: '250px' }, { width: '250px' },
+                    { width: '250px' },
+                    { orderable: false, searchable: false, width: '150px' }
                 ]
             });
         })
@@ -1853,6 +1832,11 @@ async function importarExcel(event) {
             form.reset();
             document.getElementById('file-info').style.display = 'none';
             document.getElementById('btn-importar').disabled = true;
+            // Refrescar todo incluyendo los dropdowns de filtros
+            cargarCategorias();
+            cargarTipos5W();
+            cargarMeses();
+            cargarNiveles();
             cargarAnalisis();
             cargarEstadisticas();
             if (vistaActual === 'tabla') {
