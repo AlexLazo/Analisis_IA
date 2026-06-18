@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Admin - Análisis 5 Porqués</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- DataTables -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <!-- SheetJS para exportación a Excel - usando unpkg CDN -->
+    <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1>🎯 Dashboard Admin - Análisis 5 Porqués</h1>
+            <div class="header-actions">
+                <button class="btn btn-primary" onclick="mostrarModalNuevo()">
+                    ➕ Nuevo Análisis
+                </button>
+                <button class="btn btn-secondary" onclick="mostrarModalImportar()">
+                    📥 Importar Excel
+                </button>
+                <button class="btn btn-warning" onclick="evaluarTodosPendientes()" id="btn-evaluar-todos">
+                    🤖 Evaluar Todos Pendientes
+                </button>
+                <button class="btn btn-success" onclick="cambiarVista('tabla')">
+                    📋 Vista Tabla
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Tabs de Vista -->
+    <div class="view-tabs">
+        <div class="container">
+            <button class="view-tab active" data-view="cards" onclick="cambiarVista('cards')">
+                📇 Vista Cards
+            </button>
+            <button class="view-tab" data-view="tabla" onclick="cambiarVista('tabla')">
+                📋 Vista Tabla Completa
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Estadísticas Generales -->
+            <section class="stats-section">
+                <h2>📊 Estadísticas Generales</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📝</div>
+                        <div class="stat-info">
+                            <h3 id="stat-total">0</h3>
+                            <p>Total Análisis</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⭐</div>
+                        <div class="stat-info">
+                            <h3 id="stat-promedio">0</h3>
+                            <p>Promedio Score</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🔗</div>
+                        <div class="stat-info">
+                            <h3 id="stat-coherencia">0</h3>
+                            <p>Coherencia Media</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🎯</div>
+                        <div class="stat-info">
+                            <h3 id="stat-causa">0</h3>
+                            <p>Alineación Causa</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Gráficos -->
+            <section class="charts-section">
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>📈 Distribución por Categoría</h3>
+                        <canvas id="chartCategoria"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>🏆 Distribución por Calificación</h3>
+                        <canvas id="chartGrades"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>🔍 Desglose Detallado de Métricas</h3>
+                        <canvas id="chartTendencia"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Nuevas Gráficas Adicionales -->
+            <section class="charts-section">
+                <h2>📊 Análisis Avanzado</h2>
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>📅 Tendencia Temporal (Últimos 12 Meses)</h3>
+                        <canvas id="chartTendenciaTemporal"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>🎯 Distribución por Nivel de Análisis</h3>
+                        <canvas id="chartNiveles"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>🚚 Top 10 Rutas con Más Problemas</h3>
+                        <canvas id="chartTopRutas"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>📊 Comparación de Métricas Globales</h3>
+                        <canvas id="chartMetricasPromedio"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Filtros -->
+            <section class="filters-section">
+                <h2>🔍 Filtrar Análisis</h2>
+                <div class="filters">
+                    <select id="filter-categoria" onchange="aplicarFiltros()">
+                        <option value="">Todas las Categorías</option>
+                    </select>
+                    <select id="filter-tipo-5w" onchange="aplicarFiltros()">
+                        <option value="">Todos los Tipos de 5W</option>
+                    </select>
+                    <select id="filter-mes" onchange="aplicarFiltros()">
+                        <option value="">Todos los Meses</option>
+                    </select>
+                    <select id="filter-nivel" onchange="aplicarFiltros()">
+                        <option value="">Todos los Niveles</option>
+                    </select>
+                    <input type="text" id="filter-ruta" placeholder="Buscar por ruta..." onkeyup="filtrarPorRuta()">
+                    <button class="btn btn-info" onclick="aplicarFiltros()">🔄 Actualizar</button>
+                </div>
+            </section>
+
+            <!-- Vista Cards (Original) -->
+            <section id="vista-cards" class="analisis-section view-content active">
+                <h2>📋 Lista de Análisis</h2>
+                <div id="loading" class="loading">Cargando...</div>
+                <div id="analisis-list" class="analisis-list">
+                    <!-- Se llenará dinámicamente -->
+                </div>
+                <div id="paginacion-cards"></div>
+            </section>
+
+            <!-- Vista Tabla Completa -->
+            <section id="vista-tabla" class="table-section view-content">
+                <div class="table-header">
+                    <h2>📊 Tabla Completa de Análisis con Evaluaciones IA</h2>
+                    <div class="table-actions">
+                        <select id="filter-categoria-tabla" onchange="cargarTablaCompleta()">
+                            <option value="">Todas las Categorías</option>
+                        </select>
+                        <select id="filter-tipo-5w-tabla" onchange="cargarTablaCompleta()">
+                            <option value="">Todos los Tipos de 5W</option>
+                        </select>
+                        <select id="filter-mes-tabla" onchange="cargarTablaCompleta()">
+                            <option value="">Todos los Meses</option>
+                        </select>
+                        <select id="filter-nivel-tabla" onchange="cargarTablaCompleta()">
+                            <option value="">Todos los Niveles</option>
+                        </select>
+                        <button class="btn btn-sm btn-info" onclick="cargarTablaCompleta()">🔄 Actualizar</button>
+                        <button class="btn btn-sm btn-success" onclick="exportarTablaExcel()">📊 Exportar Excel</button>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table id="tabla-analisis" class="display nowrap" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Categoría</th>
+                                <th>Tipo 5W</th>
+                                <th>Nivel</th>
+                                <th>Ruta</th>
+                                <th>Fecha</th>
+                                <th>Score</th>
+                                <th>Grade</th>
+                                <th>Coherencia</th>
+                                <th>Causa Raíz</th>
+                                <th>Plan Acción</th>
+                                <th>Problema</th>
+                                <th>Por qué 1</th>
+                                <th>Por qué 2</th>
+                                <th>Por qué 3</th>
+                                <th>Causa Raíz Completa</th>
+                                <th>Plan Completo</th>
+                                <th>Fortalezas</th>
+                                <th>Debilidades</th>
+                                <th>Sugerencias</th>
+                                <th>Tips IA</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Se llenará dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Top/Bottom Análisis -->
+            <section class="top-bottom-section">
+                <div class="top-bottom-grid">
+                    <div class="top-card">
+                        <h3>🏆 Mejores Análisis</h3>
+                        <div id="mejores-list" class="mini-list"></div>
+                    </div>
+                    <div class="bottom-card">
+                        <h3>⚠️ Requieren Mejora</h3>
+                        <div id="peores-list" class="mini-list"></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Modal Nuevo Análisis -->
+    <div id="modal-nuevo" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="cerrarModal('modal-nuevo')">&times;</span>
+            <h2>➕ Nuevo Análisis 5W</h2>
+            <form id="form-nuevo" onsubmit="crearAnalisis(event)">
+                <div class="form-group">
+                    <label>Categoría *</label>
+                    <select name="categoria" required>
+                        <option value="TML">TML - Tiempo de Liberación</option>
+                        <option value="TR">TR - Tiempo en Ruta</option>
+                        <option value="PNP">PNP - Paradas No Planificadas</option>
+                        <option value="DEV">DEV - Devoluciones</option>
+                        <option value="MOD">MOD - Modulaciones</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Ruta *</label>
+                    <input type="text" name="ruta" placeholder="Ej: DS0001" required>
+                </div>
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" name="fecha">
+                </div>
+                <div class="form-group">
+                    <label>Problema Inicial *</label>
+                    <textarea name="problema" rows="2" required placeholder="Describe el problema observado..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>¿Por qué 1? *</label>
+                    <textarea name="por_que_1" rows="2" required placeholder="Primera causa..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>¿Por qué 2? *</label>
+                    <textarea name="por_que_2" rows="2" required placeholder="Segunda causa..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>¿Por qué 3? *</label>
+                    <textarea name="por_que_3" rows="2" required placeholder="Tercera causa..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>¿Por qué 4?</label>
+                    <textarea name="por_que_4" rows="2" placeholder="Cuarta causa (opcional)..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Causa Raíz *</label>
+                    <textarea name="causa_raiz" rows="2" required placeholder="Causa raíz identificada..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Plan de Acción *</label>
+                    <textarea name="plan_accion" rows="3" required placeholder="Plan de acción concreto..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" name="auto_evaluar" checked>
+                        Evaluar automáticamente con IA
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="cerrarModal('modal-nuevo')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">💾 Guardar y Evaluar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Importar (Mejorado con Upload) -->
+    <div id="modal-importar" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="cerrarModal('modal-importar')">&times;</span>
+            <h2>📥 Importar desde Excel</h2>
+            <form id="form-importar" onsubmit="importarExcel(event)" enctype="multipart/form-data">
+                <div class="upload-area" id="upload-area">
+                    <div class="upload-icon">📂</div>
+                    <p><strong>Arrastra tu archivo Excel aquí</strong></p>
+                    <p class="upload-hint">o haz clic para seleccionar (formato .xlsx o .xls)</p>
+                    <input type="file" id="excel-file" name="file" accept=".xlsx,.xls" style="display:none" onchange="mostrarInfoArchivo(this)">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('excel-file').click()">
+                        📁 Seleccionar Archivo
+                    </button>
+                </div>
+                <div id="file-info" class="file-info" style="display:none">
+                    <p class="file-info-name">📄 <span id="file-name"></span></p>
+                    <p class="file-info-size"><small>Tamaño: <span id="file-size"></span></small></p>
+                </div>
+                <div class="form-group">
+                    <label>Filtrar por categoría (opcional)</label>
+                    <select name="categoria">
+                        <option value="">Todas</option>
+                        <option value="TML">TML</option>
+                        <option value="TR">TR</option>
+                        <option value="PNP">PNP</option>
+                        <option value="DEV">DEV</option>
+                        <option value="MOD">MOD</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Límite de registros (opcional)</label>
+                    <input type="number" name="limite" placeholder="Dejar vacío para importar todos" min="1" step="1">
+                    <small style="color: #666;">💡 Recomendado: 100-500 registros para pruebas</small>
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" name="auto_evaluar" id="auto-evaluar-check" value="1" checked>
+                        <span>🤖 Auto-evaluar con IA después de importar</span>
+                    </label>
+                    <small style="color: #666; display: block; margin-top: 4px;">
+                        ✨ La evaluación se ejecutará en segundo plano sin bloquear la importación. 
+                        Refresca la página después de unos minutos para ver los resultados.
+                    </small>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="cerrarModal('modal-importar')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="btn-importar" disabled>📥 Importar Datos</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal Detalle Completo -->
+    <div id="modal-detalle" class="modal">
+        <div class="modal-content modal-large">
+            <span class="close" onclick="cerrarModal('modal-detalle')">&times;</span>
+            <div id="detalle-content">
+                <!-- Se llenará dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

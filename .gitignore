@@ -1,0 +1,91 @@
+# Archivos de herramientas internas (NO SUBIR)
+5W_IA.py
+batch_review_5whys.py
+calcular_fechas_entrenamientos.py
+five_whys_generator.py
+five_whys_ollama copy.py
+five_whys_ollama.py
+five_whys_reviewer.py
+formulario_5porques_devoluciones.py
+formulario_5porques_final.py
+formulario_5porques_jornada_laboral.py
+formulario_5porques_tml_ia.py
+formulario_5porques_tml.py
+formulario_5porques_fleet_ia.py
+resolucion_casos_ia.py
+resolucion_casos_nps_ia.py
+resolucion_casos_servicio_ia.py
+resolucion_casos_zendesk_ia.py
+explorar_zendesk.py
+comentarios_fleet.py
+generar_metricas.py
+fix_dashboard_issues.py
+migrate_*.py
+populate_*.py
+regenerate_*.py
+clean_duplicates.py
+reporte_5whys.md
+test_reviewer.py
+test_*.py
+check_*.py
+
+# Excels y datos locales (NO SUBIR — datos sensibles)
+*.xlsx
+*.xls
+
+# Documentación de deployment (innecesaria en repo)
+DEPLOYMENT_READY.md
+RAILWAY_DEPLOYMENT.md
+GUIA_RAPIDA.md
+
+# Secretos
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Base de datos local (usaremos una nueva en Railway)
+*.db
+*.sqlite
+*.sqlite3
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Archivos temporales
+*.tmp
+*.bak
