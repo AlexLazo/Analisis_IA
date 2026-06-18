@@ -1087,8 +1087,9 @@ def evaluar_analisis_background(analisis_ids):
                     # Actualizar métricas parcialmente
                     MetricasDB.actualizar_metricas_diarias()
             
-            # Pausa adaptativa (más larga si hubo timeouts recientes)
-            pausa = 0.5 if timeouts > 3 else 0.2
+            # Pausa para respetar el rate limit de Groq (30 req/min = mín 2s entre requests)
+            # Con errores recientes aumentamos a 5s para dejar que el límite se recupere
+            pausa = 5.0 if timeouts > 3 else 2.2
             time.sleep(pausa)
             
         except Exception as e:

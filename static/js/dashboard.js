@@ -859,72 +859,52 @@ function initCharts() {
     // Inicializar Nuevas Gráficas Adicionales
     // ========================================================================
     
-    // 1. Tendencia Temporal (línea con doble eje)
+    // 1. Desempeño Mensual — Score promedio por mes (barras)
     const ctxTemporal = document.getElementById('chartTendenciaTemporal').getContext('2d');
     chartTendenciaTemporal = new Chart(ctxTemporal, {
-        type: 'line',
+        type: 'bar',
         data: {
             labels: [],
             datasets: [
                 {
-                    label: 'Análisis Evaluados',
+                    label: 'Score Promedio',
                     data: [],
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    borderWidth: 2,
-                    fill: true,
-                    yAxisID: 'y',
-                    tension: 0.4
-                },
-                {
-                    label: 'Score Promedio (%)',
-                    data: [],
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    borderWidth: 2,
-                    fill: false,
-                    yAxisID: 'y1',
-                    tension: 0.4
+                    backgroundColor: [],
+                    borderColor: [],
+                    borderWidth: 1,
+                    borderRadius: 6,
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: true,
-            interaction: {
-                mode: 'index',
-                intersect: false,
-            },
             plugins: {
-                legend: {
-                    display: true,
-                    position: 'top'
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return ` Score: ${ctx.parsed.y.toFixed(1)} / 100`;
+                        },
+                        afterLabel: function(ctx) {
+                            const idx = ctx.dataIndex;
+                            const count = chartTendenciaTemporal._evaluadosPorMes?.[idx] ?? '';
+                            return count !== '' ? ` Análisis evaluados: ${count}` : '';
+                        }
+                    }
                 }
             },
             scales: {
                 y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
-                    title: {
-                        display: true,
-                        text: 'Cantidad de Análisis Evaluados'
-                    },
-                    beginAtZero: true
-                },
-                y1: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'Score Promedio (%)'
-                    },
                     beginAtZero: true,
                     max: 100,
-                    grid: {
-                        drawOnChartArea: false,
+                    ticks: {
+                        callback: v => v + '%'
                     },
+                    title: { display: true, text: 'Score Promedio (%)' }
+                },
+                x: {
+                    title: { display: true, text: 'Mes' }
                 }
             }
         }
@@ -1189,18 +1169,31 @@ async function cargarTendenciaTemporal() {
         if (!data || data.length === 0) {
             chartTendenciaTemporal.data.labels = ['Sin datos'];
             chartTendenciaTemporal.data.datasets[0].data = [0];
-            chartTendenciaTemporal.data.datasets[1].data = [0];
+            chartTendenciaTemporal.data.datasets[0].backgroundColor = ['#e5e7eb'];
             chartTendenciaTemporal.update();
             return;
         }
-        
+
+        // Color de barra según score promedio del mes
+        function colorPorScore(score) {
+            if (score >= 85) return { bg: 'rgba(16,185,129,0.8)', border: '#059669' };   // verde
+            if (score >= 70) return { bg: 'rgba(59,130,246,0.8)',  border: '#2563eb' };  // azul
+            if (score >= 55) return { bg: 'rgba(245,158,11,0.8)', border: '#d97706' };  // amarillo
+            return            { bg: 'rgba(239,68,68,0.8)',  border: '#dc2626' };         // rojo
+        }
+
+        const scores    = data.map(d => d.score_promedio);
+        const colores   = scores.map(colorPorScore);
+
         chartTendenciaTemporal.data.labels = data.map(d => d.mes_nombre);
-        // Usar solo análisis evaluados, no el total
-        chartTendenciaTemporal.data.datasets[0].data = data.map(d => d.evaluados);
-        chartTendenciaTemporal.data.datasets[1].data = data.map(d => d.score_promedio);
+        chartTendenciaTemporal.data.datasets[0].data            = scores;
+        chartTendenciaTemporal.data.datasets[0].backgroundColor = colores.map(c => c.bg);
+        chartTendenciaTemporal.data.datasets[0].borderColor     = colores.map(c => c.border);
+        // Guardamos los evaluados para el tooltip
+        chartTendenciaTemporal._evaluadosPorMes = data.map(d => d.evaluados);
         chartTendenciaTemporal.update();
-        
-        console.log('📅 Tendencia temporal actualizada:', data.length, 'meses', '| Total evaluados:', data.reduce((sum, d) => sum + d.evaluados, 0));
+
+        console.log('📅 Desempeño mensual actualizado:', data.length, 'meses');
     } catch (error) {
         console.error('Error cargando tendencia temporal:', error);
     }
