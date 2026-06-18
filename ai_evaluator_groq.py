@@ -131,35 +131,59 @@ class AIEvaluatorGroq:
         causa = fw.get('causa_raiz', '').strip()
         plan = fw.get('plan_accion', '').strip()
 
-        return f"""Evalúa la CALIDAD del análisis 5 Porqués (no el problema operativo). Sé crítico y objetivo.
+        pq4_texto = pq4 or 'No aplica'
+        tiene_4_porques = bool(pq4)
 
-ANÁLISIS:
+        return f"""Eres un evaluador experto en metodología 5 Porqués aplicada a operaciones de distribución logística.
+
+Evalúa la CALIDAD METODOLÓGICA del análisis (no el problema operativo).
+
+CONTEXTO: Área {categoria or 'distribución'}. Los análisis pueden usar 3, 4 o 5 porqués según la profundidad requerida — usar 3 porqués no es automáticamente malo si la cadena es coherente y la causa raíz es real.
+
+ANÁLISIS A EVALUAR:
 Problema: {problema}
 1° Por qué: {pq1}
 2° Por qué: {pq2}
 3° Por qué: {pq3}
-4° Por qué: {pq4 or 'No especificado'}
+4° Por qué: {pq4_texto}
 Causa Raíz: {causa}
-Plan: {plan}
+Plan de Acción: {plan}
 
-EVALÚA (0-100):
-1. chain_coherence: ¿Cada porqué conecta lógicamente? ¿Profundiza o hay saltos?
-2. root_cause_alignment: ¿La causa raíz se deriva de los porqués? ¿Es verdadera raíz o síntoma?
-3. action_plan_alignment: ¿El plan ataca la causa raíz? ¿Es concreto y medible?
+CRITERIOS DE EVALUACIÓN (0-100 cada uno):
 
-IMPORTANTE: Las sugerencias/tips deben ser sobre CÓMO MEJORAR EL ANÁLISIS (metodología, profundidad, datos, redacción), NO sobre resolver el problema operativo.
+chain_coherence — Coherencia de la cadena:
+- 90-100: Cada porqué responde al anterior con lógica causal clara, sin saltos
+- 70-89: Cadena mayormente coherente con algún porqué circular o débil
+- 50-69: Algunos porqués no conectan bien o repiten la misma idea
+- <50: Cadena rota, porqués no relacionados o genéricos
 
-JSON español:
+root_cause_alignment — Calidad de la causa raíz:
+- 90-100: Causa raíz es sistémica, atacable, no un síntoma, se deriva directamente de los porqués
+- 70-89: Causa raíz correcta pero podría profundizarse más
+- 50-69: Causa raíz es un síntoma o no cierra bien con los porqués
+- <50: Causa raíz no se relaciona con la cadena o es trivial
+
+action_plan_alignment — Calidad del plan de acción:
+- 90-100: Plan concreto, medible, ataca directamente la causa raíz
+- 70-89: Plan relevante pero le falta especificidad o medición
+- 50-69: Plan genérico o solo parcialmente relacionado con la causa raíz
+- <50: Plan no ataca la causa raíz o es inviable
+
+score = promedio ponderado: (chain_coherence * 0.35 + root_cause_alignment * 0.35 + action_plan_alignment * 0.30)
+
+IMPORTANTE: Las sugerencias y tips deben ser sobre CÓMO MEJORAR EL ANÁLISIS (metodología, profundidad, redacción), NO sobre resolver el problema operativo.
+
+JSON en español, sin texto adicional:
 {{
   "score": <0-100>,
   "chain_coherence": <0-100>,
   "root_cause_alignment": <0-100>,
   "action_plan_alignment": <0-100>,
-  "strengths": ["<fortaleza del análisis 1>", "<fortaleza 2>", "<fortaleza 3>"],
-  "weaknesses": ["<debilidad del análisis 1>", "<debilidad 2>", "<debilidad 3>"],
-  "suggestions": ["<cómo mejorar metodología>", "<cómo profundizar>", "<cómo hacer robusto>"],
+  "strengths": ["<fortaleza metodológica 1>", "<fortaleza 2>", "<fortaleza 3>"],
+  "weaknesses": ["<debilidad metodológica 1>", "<debilidad 2>", "<debilidad 3>"],
+  "suggestions": ["<cómo mejorar metodología>", "<cómo profundizar>", "<cómo hacer más robusto>"],
   "tips": ["<tip metodológico 1>", "<tip 2>", "<tip 3>"],
-  "detail": "<Oportunidad de mejora del análisis en 2 líneas>"
+  "detail": "<Resumen de la principal oportunidad de mejora del análisis en 2 líneas>"
 }}"""
 
     def _build_simplified_prompt(self, fw: Dict[str, str], categoria: str) -> str:

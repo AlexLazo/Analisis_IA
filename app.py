@@ -1164,18 +1164,24 @@ def importar_excel():
         importados = 0
         errores = []
         
-        # Mapeo DIRECTO de columnas basado en tu Excel exacto
-        col_area = 'Área:' if 'Área:' in df.columns else None
-        col_tipo_5w = 'Indicador de Distribución Impactado:' if 'Indicador de Distribución Impactado:' in df.columns else None
-        col_ruta = 'Código de Ruta Impactada:1' if 'Código de Ruta Impactada:1' in df.columns else 'Código de Ruta Impactada:' if 'Código de Ruta Impactada:' in df.columns else None
-        col_fecha = 'Fecha:' if 'Fecha:' in df.columns else None
-        col_pq1 = '1° ¿Por qué?' if '1° ¿Por qué?' in df.columns else None
-        col_pq2 = '2° ¿Por qué?' if '2° ¿Por qué?' in df.columns else None
-        col_pq3 = '3° ¿Por qué?1' if '3° ¿Por qué?1' in df.columns else '3° ¿Por qué?' if '3° ¿Por qué?' in df.columns else None
-        col_pq4 = '4° ¿Por qué?1' if '4° ¿Por qué?1' in df.columns else '4° ¿Por qué?' if '4° ¿Por qué?' in df.columns else None
-        col_pq5 = '5° ¿Por qué?1' if '5° ¿Por qué?1' in df.columns else '5° ¿Por qué?' if '5° ¿Por qué?' in df.columns else None
-        col_causa = 'Causa Raíz - ¿Qué ocasionó la desviación?' if 'Causa Raíz - ¿Qué ocasionó la desviación?' in df.columns else None
-        col_plan = 'Plan de Acción - ¿Cómo corregir la causa raíz?1' if 'Plan de Acción - ¿Cómo corregir la causa raíz?1' in df.columns else 'Plan de Acción - ¿Cómo corregir la causa raíz?' if 'Plan de Acción - ¿Cómo corregir la causa raíz?' in df.columns else None
+        # Mapeo flexible de columnas — soporta formato antiguo (con ":") y nuevo (sin ":")
+        def _col(*candidatos):
+            for c in candidatos:
+                if c in df.columns:
+                    return c
+            return None
+
+        col_area   = _col('Área:', 'Área', 'Area:', 'Area')
+        col_tipo_5w = _col('Indicador de Distribución Impactado:', 'KPI Impactado', 'KPI', 'Indicador')
+        col_ruta   = _col('Código de Ruta Impactada:1', 'Código de Ruta Impactada:', 'Equipo Impactado', 'Ruta')
+        col_fecha  = _col('Fecha:', 'Fecha')
+        col_pq1    = _col('1° ¿Por qué?', '1ero ¿Por qué?')
+        col_pq2    = _col('2° ¿Por qué?', '2do ¿Por qué?')
+        col_pq3    = _col('3° ¿Por qué?1', '3° ¿Por qué?', '3ro ¿Por qué?')
+        col_pq4    = _col('4° ¿Por qué?1', '4° ¿Por qué?', '4to ¿Por qué?')
+        col_pq5    = _col('5° ¿Por qué?1', '5° ¿Por qué?', '5to ¿Por qué?')
+        col_causa  = _col('Causa Raíz - ¿Qué ocasionó la desviación?', 'Causa Raíz', 'Causa raiz')
+        col_plan   = _col('Plan de Acción - ¿Cómo corregir la causa raíz?1', 'Plan de Acción - ¿Cómo corregir la causa raíz?', 'Plan de Acción', 'Plan de Accion')
         
         print(f"📋 Mapeo de columnas:")
         print(f"  Área: {col_area}")
