@@ -56,6 +56,17 @@ else:
     print("🤖 Backend IA: Ollama local")
     evaluator = AIEvaluator(model="llama3.1:8b", timeout=180)
 
+# ── Control de evaluación en background ─────────────────────────────────────
+_eval_stop_event = threading.Event()   # set() para detener el loop
+_eval_status = {                        # estado visible desde la API
+    "corriendo": False,
+    "total": 0,
+    "evaluados": 0,
+    "errores": 0,
+    "consecutivos_fallidos": 0,
+    "detenido_por": None,              # "usuario" | "auto" | None
+}
+
 
 # ============================================================================
 # RUTAS WEB (Frontend)
@@ -1046,64 +1057,91 @@ def obtener_metricas_promedio():
 # ============================================================================
 
 def evaluar_analisis_background(analisis_ids):
-    """Evalúa análisis en segundo plano sin bloquear la respuesta HTTP"""
+    """Evalúa análisis en segundo plano con stop manual y auto-stop por fallos consecutivos"""
+    global _eval_status
+    _eval_stop_event.clear()
+    _eval_status.update({
+        "corriendo": True,
+        "total": len(analisis_ids),
+        "evaluados": 0,
+        "errores": 0,
+        "consecutivos_fallidos": 0,
+        "detenido_por": None,
+    })
+
+    MAX_CONSECUTIVOS = 5   # auto-stop si hay 5 fallos seguidos
+    PAUSA_NORMAL     = 2.2 # segundos entre requests (≤ 30 RPM)
+    PAUSA_BACKOFF    = 15  # pausa al detectar rate-limit / error de API
+
     print(f"🤖 Iniciando evaluación en background de {len(analisis_ids)} análisis...")
-    evaluados = 0
-    errores = 0
-    timeouts = 0
-    
+
     for idx, analisis_id in enumerate(analisis_ids, 1):
+
+        # ── Comprobar señal de parada ────────────────────────────────────────
+        if _eval_stop_event.is_set():
+            _eval_status["detenido_por"] = "usuario"
+            print("🛑 Evaluación detenida por el usuario.")
+            break
+
+        # ── Auto-stop por fallos consecutivos ───────────────────────────────
+        if _eval_status["consecutivos_fallidos"] >= MAX_CONSECUTIVOS:
+            _eval_status["detenido_por"] = "auto"
+            print(f"🛑 Auto-stop: {MAX_CONSECUTIVOS} fallos consecutivos. Probable límite de API alcanzado.")
+            break
+
         try:
             print(f"\n📋 [{idx}/{len(analisis_ids)}] Evaluando análisis ID: {analisis_id}")
-            
             analisis = AnalisisDB.obtener_analisis(analisis_id)
-            if analisis:
-                # Evaluar (con reintentos automáticos)
-                evaluacion = evaluator.evaluar(analisis, analisis.get('categoria', 'GENERAL'))
-                
-                # Si la evaluación fue con fallback (error), contar como timeout
-                if "Timeout" in evaluacion.detail or "Error" in evaluacion.detail:
-                    timeouts += 1
-                    print(f"⚠️ Evaluación con fallback para análisis {analisis_id}")
-                
-                eval_dict = {
-                    'score': evaluacion.score,
-                    'grade': evaluacion.grade,
-                    'chain_coherence': evaluacion.chain_coherence,
-                    'root_cause_alignment': evaluacion.root_cause_alignment,
-                    'action_plan_alignment': evaluacion.action_plan_alignment,
-                    'strengths': evaluacion.strengths,
-                    'weaknesses': evaluacion.weaknesses,
-                    'suggestions': evaluacion.suggestions,
-                    'tips': evaluacion.tips,
-                    'detail': evaluacion.detail
-                }
-                
-                EvaluacionDB.crear_evaluacion(analisis_id, eval_dict)
-                evaluados += 1
-                
-                if evaluados % 5 == 0:
-                    print(f"✅ Progreso: {evaluados}/{len(analisis_ids)} evaluados ({errores} errores, {timeouts} timeouts)")
-                    # Actualizar métricas parcialmente
-                    MetricasDB.actualizar_metricas_diarias()
-            
-            # Pausa para respetar el rate limit de Groq (30 req/min = mín 2s entre requests)
-            # Con errores recientes aumentamos a 5s para dejar que el límite se recupere
-            pausa = 5.0 if timeouts > 3 else 2.2
-            time.sleep(pausa)
-            
+            if not analisis:
+                continue
+
+            evaluacion = evaluator.evaluar(analisis, analisis.get('categoria', 'GENERAL'))
+
+            es_fallback = "fallback" in evaluacion.detail.lower() or "error" in evaluacion.detail.lower()
+
+            if es_fallback:
+                _eval_status["consecutivos_fallidos"] += 1
+                _eval_status["errores"] += 1
+                print(f"⚠️ Fallback para análisis {analisis_id} "
+                      f"(consecutivos: {_eval_status['consecutivos_fallidos']})")
+                time.sleep(PAUSA_BACKOFF)
+                continue   # no guardar evaluación basura
+            else:
+                _eval_status["consecutivos_fallidos"] = 0  # reset al tener éxito
+
+            eval_dict = {
+                'score': evaluacion.score,
+                'grade': evaluacion.grade,
+                'nivel_analisis': evaluacion.nivel_analisis,
+                'chain_coherence': evaluacion.chain_coherence,
+                'root_cause_alignment': evaluacion.root_cause_alignment,
+                'action_plan_alignment': evaluacion.action_plan_alignment,
+                'strengths': evaluacion.strengths,
+                'weaknesses': evaluacion.weaknesses,
+                'suggestions': evaluacion.suggestions,
+                'tips': evaluacion.tips,
+                'detail': evaluacion.detail,
+            }
+            EvaluacionDB.crear_evaluacion(analisis_id, eval_dict)
+            _eval_status["evaluados"] += 1
+
+            if _eval_status["evaluados"] % 10 == 0:
+                MetricasDB.actualizar_metricas_diarias()
+                print(f"✅ Progreso: {_eval_status['evaluados']}/{len(analisis_ids)}")
+
+            time.sleep(PAUSA_NORMAL)
+
         except Exception as e:
-            print(f"❌ Error crítico evaluando análisis {analisis_id}: {str(e)[:200]}")
-            errores += 1
-            # Pausa más larga después de error crítico
-            time.sleep(1)
-    
-    # Actualizar métricas al final
+            _eval_status["errores"] += 1
+            _eval_status["consecutivos_fallidos"] += 1
+            print(f"❌ Error crítico ID {analisis_id}: {str(e)[:200]}")
+            time.sleep(PAUSA_BACKOFF)
+
     MetricasDB.actualizar_metricas_diarias()
-    print(f"\n🎉 Evaluación background completada:")
-    print(f"   ✅ Exitosos: {evaluados}")
-    print(f"   ⚠️ Timeouts/Fallback: {timeouts}")
-    print(f"   ❌ Errores críticos: {errores}")
+    _eval_status["corriendo"] = False
+    razon = _eval_status["detenido_por"] or "completado"
+    print(f"\n🎉 Evaluación background {razon}: "
+          f"{_eval_status['evaluados']} ok, {_eval_status['errores']} errores")
 
 @app.route('/api/importar', methods=['POST'])
 def importar_excel():
@@ -1320,6 +1358,21 @@ def importar_excel():
 # ============================================================================
 # Utilidades
 # ============================================================================
+
+@app.route('/api/evaluar/parar', methods=['POST'])
+def parar_evaluacion():
+    """Detiene el background evaluator en el próximo ciclo"""
+    if _eval_status["corriendo"]:
+        _eval_stop_event.set()
+        return jsonify({'success': True, 'message': '🛑 Señal de parada enviada'})
+    return jsonify({'success': False, 'message': 'No hay evaluación en curso'})
+
+
+@app.route('/api/evaluar/progreso', methods=['GET'])
+def progreso_evaluacion():
+    """Devuelve el estado actual del background evaluator"""
+    return jsonify({'success': True, 'data': _eval_status})
+
 
 @app.route('/api/health', methods=['GET'])
 def health_check():

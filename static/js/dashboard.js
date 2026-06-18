@@ -1793,24 +1793,8 @@ async function importarExcel(event) {
             
             // Mensaje adicional según si está evaluando en background o no
             if (result.evaluando_background) {
-                setTimeout(() => {
-                    mostrarNotificacion(
-                        `⚡ Evaluación en progreso... Los resultados aparecerán progresivamente. Refresca la página en unos minutos.`, 
-                        'info'
-                    );
-                }, 2000);
-                
-                // Auto-refrescar cada 30 segundos si está evaluando
-                const refreshInterval = setInterval(() => {
-                    cargarAnalisis();
-                    cargarEstadisticas();
-                    if (vistaActual === 'tabla') {
-                        cargarTablaCompleta();
-                    }
-                }, 30000); // 30 segundos
-                
-                // Detener después de 10 minutos
-                setTimeout(() => clearInterval(refreshInterval), 600000);
+                mostrarNotificacion('⚡ Evaluación en progreso — puedes seguir el avance en la barra superior.', 'info');
+                iniciarPollingProgreso();
                 
             } else if (result.sin_evaluar > 0) {
                 setTimeout(() => {
@@ -1841,6 +1825,65 @@ async function importarExcel(event) {
         console.error('Error importando:', error);
         mostrarNotificacion('❌ Error importando Excel', 'error');
     }
+}
+
+// ============================================================================
+// Control de evaluación en background (parar + progreso)
+// ============================================================================
+
+let _progresoInterval = null;
+
+async function pararEvaluacion() {
+    try {
+        const res = await axios.post(`${API_BASE}/evaluar/parar`);
+        mostrarNotificacion(res.data.message, res.data.success ? 'info' : 'error');
+    } catch (e) {
+        mostrarNotificacion('Error enviando señal de parada', 'error');
+    }
+}
+
+function iniciarPollingProgreso() {
+    if (_progresoInterval) return; // ya está corriendo
+    document.getElementById('btn-parar-eval').style.display = 'inline-block';
+    document.getElementById('btn-evaluar-todos').disabled = true;
+    document.getElementById('eval-progress-bar').style.display = 'block';
+
+    _progresoInterval = setInterval(async () => {
+        try {
+            const res = await axios.get(`${API_BASE}/evaluar/progreso`);
+            const d = res.data.data;
+
+            const pct = d.total > 0 ? Math.round((d.evaluados / d.total) * 100) : 0;
+            document.getElementById('eval-progress-fill').style.width = pct + '%';
+            document.getElementById('eval-progress-pct').textContent = pct + '%';
+
+            let texto = `⏳ Evaluando ${d.evaluados}/${d.total}`;
+            if (d.errores > 0) texto += ` · ⚠️ ${d.errores} errores`;
+            document.getElementById('eval-progress-text').textContent = texto;
+
+            if (!d.corriendo) {
+                detenerPollingProgreso(d.detenido_por);
+                cargarAnalisis();
+                cargarEstadisticas();
+                cargarCategorias(); cargarTipos5W(); cargarMeses(); cargarNiveles();
+            }
+        } catch (e) { /* ignorar errores de red temporales */ }
+    }, 3000);
+}
+
+function detenerPollingProgreso(razon) {
+    clearInterval(_progresoInterval);
+    _progresoInterval = null;
+    document.getElementById('btn-parar-eval').style.display = 'none';
+    document.getElementById('btn-evaluar-todos').disabled = false;
+    document.getElementById('eval-progress-bar').style.display = 'none';
+
+    const msgs = {
+        completado: '✅ Evaluación completada',
+        usuario:    '🛑 Evaluación detenida por el usuario',
+        auto:       '🛑 Evaluación detenida automáticamente: demasiados fallos consecutivos de Groq. Inténtalo más tarde.',
+    };
+    mostrarNotificacion(msgs[razon] || '✅ Evaluación finalizada', razon === 'auto' ? 'error' : 'success');
 }
 
 // ============================================================================

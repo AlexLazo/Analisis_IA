@@ -29,12 +29,27 @@
                 <button class="btn btn-warning" onclick="evaluarTodosPendientes()" id="btn-evaluar-todos">
                     🤖 Evaluar Todos Pendientes
                 </button>
+                <button class="btn btn-danger" onclick="pararEvaluacion()" id="btn-parar-eval"
+                        style="display:none;">
+                    ⏹ Parar Evaluación
+                </button>
                 <button class="btn btn-success" onclick="cambiarVista('tabla')">
                     📋 Vista Tabla
                 </button>
             </div>
         </div>
     </header>
+
+    <!-- Barra de progreso de evaluación (oculta por defecto) -->
+    <div id="eval-progress-bar" style="display:none; background:#1e293b; padding:10px 20px; color:#fff; font-size:13px;">
+        <div style="display:flex; align-items:center; gap:14px; max-width:1200px; margin:0 auto;">
+            <span id="eval-progress-text">⏳ Evaluando...</span>
+            <div style="flex:1; background:#334155; border-radius:4px; height:8px; overflow:hidden;">
+                <div id="eval-progress-fill" style="height:100%; background:#10b981; width:0%; transition:width 0.4s;"></div>
+            </div>
+            <span id="eval-progress-pct" style="min-width:40px; text-align:right;">0%</span>
+        </div>
+    </div>
 
     <!-- Tabs de Vista -->
     <div class="view-tabs">
